@@ -17,4 +17,4 @@ jobs:
       - name: Push to hub
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: git push https://macrocosmos:$HF_TOKEN@huggingface.co/spaces/macrocosmos/sn1 main
+        run: git push https://macrocosm-os:$HF_TOKEN@huggingface.co/spaces/macrocosm-os/sn1 main
