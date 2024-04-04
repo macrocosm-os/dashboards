@@ -11,7 +11,7 @@ from opendashboards.assets import io, inspect, metric, plot
 DEFAULT_PROJECT = "alpha-validators"
 DEFAULT_FILTERS = {"tags": {"$in": [f'1.1.{i}' for i in range(10)]}}
 DEFAULT_SELECTED_HOTKEYS = None
-DEFAULT_SRC = 'followup'
+DEFAULT_TASK = 'qa'
 DEFAULT_COMPLETION_NTOP = 10
 DEFAULT_UID_NTOP = 10
 
