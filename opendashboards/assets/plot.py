@@ -2,6 +2,12 @@
 import streamlit as st
 import opendashboards.utils.plotting as plotting
 
+def timeline(df_runs, color='state'):
+    return st.plotly_chart(
+        plotting.plot_gantt(df_runs, color=color),
+        use_container_width=True
+    )
+    
 # @st.cache_data
 def uid_diversty(df, rm_failed=True):
     return st.plotly_chart(

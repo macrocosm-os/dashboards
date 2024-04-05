@@ -1,4 +1,5 @@
 # https://huggingface.co/docs/hub/en/spaces-github-actions
+import os
 import time
 import pandas as pd
 import streamlit as st
@@ -7,10 +8,21 @@ from opendashboards.assets import io, inspect, metric, plot
 # prompt-based completion score stats
 # instrospect specific RUN-UID-COMPLETION
 # cache individual file loads
-# Hotkey churn
+# Hotkey
+
+# TODO: limit the historical lookup to something reasonable (e.g. 30 days)
+# TODO: Add sidebar for filters such as tags, hotkeys, etc.
+# TODO: Show trends for runs (versions, hotkeys, etc.). An area chart would be nice, a gantt chart would be better
+# TODO: Add a search bar for runs
+# TODO: Find a reason to make a pie chart (task distribution, maybe)
+# TODO: remove repetition plots (it's not really a thing any more)
+# TODO: MINER SKILLSET STAR CHART
+# TODO: Status codes for runs vs time (from analysis notebook)
 
 WANDB_PROJECT = "opentensor-dev/alpha-validators"
-DEFAULT_FILTERS = {"tags": {"$in": [f'1.1.{i}' for i in range(10)]}}
+PROJECT_URL = f'https://wandb.ai/{WANDB_PROJECT}/table?workspace=default'
+MAX_RECENT_RUNS = 100
+DEFAULT_FILTERS = {}#{"tags": {"$in": [f'1.1.{i}' for i in range(10)]}}
 DEFAULT_SELECTED_HOTKEYS = None
 DEFAULT_TASK = 'qa'
 DEFAULT_COMPLETION_NTOP = 10
@@ -24,7 +36,7 @@ st.set_page_config(
         'About': f"""
         This dashboard is part of the OpenTensor project. \n
         To see runs in wandb, go to: \n
-        https://wandb.ai/{WANDB_PROJECT}/table?workspace=default
+        [Wandb Table](https://wandb.ai/{WANDB_PROJECT}/table?workspace=default) \n
         """
     },
     layout = "centered"
@@ -36,23 +48,31 @@ st.markdown('#')
 st.markdown('#')
 
 
+
 with st.spinner(text=f'Checking wandb...'):
-    df_runs = io.load_runs(project=WANDB_PROJECT, filters=DEFAULT_FILTERS, min_steps=10)
+    df_runs = io.load_runs(project=WANDB_PROJECT, filters=DEFAULT_FILTERS, min_steps=10, max_recent=MAX_RECENT_RUNS)
 
 metric.wandb(df_runs)
 
 # add vertical space
 st.markdown('#')
+
+runid_c1, runid_c2 = st.columns([3, 1])
+# make multiselect for run_ids with label on same line
+run_ids = runid_c1.multiselect('Select one or more weights and biases run by id:', df_runs['run_id'], key='run_id', default=df_runs['run_id'][:3], help=f'Select one or more runs to analyze. You can find the raw data for these runs [here]({PROJECT_URL}).')
+n_runs = len(run_ids)
+df_runs_subset = df_runs[df_runs['run_id'].isin(run_ids)]
+
 st.markdown('#')
 
-tab1, tab2, tab3, tab4 = st.tabs(["Raw Data", "UID Health", "Completions", "Prompt-based scoring"])
+tab1, tab2, tab3, tab4 = st.tabs(["Run Data", "UID Health", "Completions", "Prompt-based scoring"])
 
 ### Wandb Runs ###
 with tab1:
 
     st.markdown('#')
     st.subheader(":violet[Run] Data")
-    with st.expander(f'Show :violet[raw] wandb data'):
+    with st.expander(f'Show :violet[all] wandb runs'):
 
         edited_df = st.data_editor(
             df_runs.assign(Select=False).set_index('Select'),
@@ -60,19 +80,25 @@ with tab1:
             disabled=df_runs.columns,
             use_container_width=True,
         )
-        df_runs_subset = df_runs[edited_df.index==True]
-        n_runs = len(df_runs_subset)
+        if edited_df.index.any():
+            df_runs_subset = df_runs[edited_df.index==True]
+            n_runs = len(df_runs_subset)
 
     if n_runs:
         df = io.load_data(df_runs_subset, load=True, save=True)
         df = inspect.clean_data(df)
         print(f'\nNans in columns: {df.isna().sum()}')
         df_long = inspect.explode_data(df)
+        if 'rewards' in df_long:
+            df_long['rewards'] = df_long['rewards'].astype(float)
     else:
         st.info(f'You must select at least one run to load data')
         st.stop()
 
     metric.runs(df_long)
+
+    timeline_color = st.radio('Color by:', ['state', 'version', 'netuid'], key='timeline_color', horizontal=True)
+    plot.timeline(df_runs, color=timeline_color)
 
     st.markdown('#')
     st.subheader(":violet[Event] Data")
@@ -97,7 +123,7 @@ with tab2:
 
     uid_src = st.radio('Select task type:', step_types, horizontal=True, key='uid_src')
     df_uid = df_long[df_long.task.str.contains(uid_src)] if uid_src != 'all' else df_long
-        
+
     metric.uids(df_uid, uid_src)
     uids = st.multiselect('UID:', sorted(df_uid['uids'].unique()), key='uid')
     with st.expander(f'Show UID health data for **{n_runs} selected runs** and **{len(uids)} selected UIDs**'):
@@ -158,7 +184,7 @@ with tab3:
     # completion_src = msg_col1.radio('Select one:', ['followup', 'answer'], horizontal=True, key='completion_src')
     completion_src = st.radio('Select task type:', step_types, horizontal=True, key='completion_src')
     df_comp = df_long[df_long.task.str.contains(completion_src)] if completion_src != 'all' else df_long
-    
+
     completion_info.info(f"Showing **{completion_src}** completions for **{n_runs} selected runs**")
 
     completion_ntop = msg_col2.slider('Top k:', min_value=1, max_value=50, value=DEFAULT_COMPLETION_NTOP, key='completion_ntop')

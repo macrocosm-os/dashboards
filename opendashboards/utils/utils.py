@@ -144,10 +144,12 @@ def read_data(path: str, nrows: int = None):
     """Load data from csv."""
     df = pd.read_csv(path, nrows=nrows)
     # filter out events with missing step length
-    df = df.loc[df.step_length.notna()]
+    # df = df.loc[df.step_length.notna()]
 
     # detect list columns which as stored as strings
-    list_cols = [c for c in df.columns if df[c].dtype == "object" and df[c].str.startswith("[").all()]
+    def is_list_col(x):
+        return isinstance(x, str) and x[0]=='[' and x[-1]==']'
+    list_cols = [c for c in df.columns if df[c].dtype == "object" and df[c].apply(is_list_col).all()]
     # convert string representation of list to list
     df[list_cols] = df[list_cols].applymap(eval, na_action='ignore')
 
@@ -161,6 +163,7 @@ def load_data(selected_runs, load=True, save=False, explode=True, datadir='data/
     if not os.path.exists(datadir):
         os.makedirs(datadir)
 
+    st.write(selected_runs)
     pbar = tqdm.tqdm(selected_runs.index, desc="Loading runs", total=len(selected_runs), unit="run")
     for i, idx in enumerate(pbar):
         run = selected_runs.loc[idx]

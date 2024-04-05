@@ -20,6 +20,7 @@ import tqdm
 import pandas as pd
 import numpy as np
 import networkx as nx
+import streamlit as st
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -28,21 +29,22 @@ from typing import List, Union
 
 plotly_config = {"width": 800, "height": 600, "template": "plotly_white"}
 
-def plot_gantt(df_runs: pd.DataFrame, y='username'):
-    fig = px.timeline(df_runs,
-                x_start="start_time", x_end="end_time", y=y, color="state",
+def plot_gantt(df_runs: pd.DataFrame, y='username', color="state"):
+    color_discrete_map={'running': 'green', 'finished': 'grey', 'killed':'blue', 'crashed':'orange', 'failed': 'red'}
+    fig = px.timeline(df_runs.astype({color: str}),
+                x_start="start_time", x_end="end_time", y=y, color=color,
                 title="Timeline of WandB Runs",
                 category_orders={'run_name': df_runs.run_name.unique()},
                 hover_name="run_name",
                 hover_data=[col for col in ['hotkey','user','username','run_id','num_steps','num_completions'] if col in df_runs],
-                color_discrete_map={'running': 'green', 'finished': 'grey', 'killed':'blue', 'crashed':'orange', 'failed': 'red'},
+                color_discrete_map={k: v for k, v in color_discrete_map.items() if k in df_runs[color].unique()},
                 opacity=0.3,
                 width=1200,
                 height=800,
                 template="plotly_white",
     )
     # remove y axis ticks
-    fig.update_yaxes(tickfont_size=8, title='')
+    fig.update_yaxes(title='')
     return fig
 
 def plot_throughput(df: pd.DataFrame, n_minutes: int = 10) -> go.Figure:

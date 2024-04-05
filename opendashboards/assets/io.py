@@ -1,5 +1,6 @@
 import os
 import re
+import time
 import pandas as pd
 import streamlit as st
 
@@ -12,8 +13,16 @@ from pandas.api.types import (
     is_object_dtype,
 )
 
-@st.cache_data
-def load_runs(project, filters, min_steps=10):
+# @st.cache_data
+def load_runs(project, filters, min_steps=10, max_recent=100, local_path='wandb_runs.csv', local_stale_time=3600):
+    # TODO: clean up the caching logic (e.g. take into account the args)
+
+    dtypes = {'state': 'category', 'hotkey': 'category', 'version': 'category', 'spec_version': 'category', 'start_time': 'datetime64[s]', 'end_time': 'datetime64[s]', 'duration': 'timedelta64[s]'}
+
+    if local_path and os.path.exists(local_path) and (time.time() - float(os.path.getmtime(local_path))) < local_stale_time:
+        frame = pd.read_csv(local_path)
+        return frame.astype({k:v for k,v in dtypes.items() if k in frame.columns})
+
     runs = []
     n_events = 0
     successful = 0
@@ -22,20 +31,25 @@ def load_runs(project, filters, min_steps=10):
 
     all_runs = utils.get_runs(project, filters)
     for i, run in enumerate(all_runs):
-        
+        if i > max_recent:
+            break 
         summary = run.summary
         step = summary.get('_step',-1) + 1
         if step < min_steps:
             msg.warning(f'Skipped run `{run.name}` because it contains {step} events (<{min_steps})')
             continue
-        
+
         prog_msg = f'Loading data {i/len(all_runs)*100:.0f}% ({successful}/{len(all_runs)} runs, {n_events} events)'
-        progress.progress(i/len(all_runs),f'{prog_msg}... **fetching** `{run.name}`')
-        
+        progress.progress(min(i/len(all_runs),1),f'{prog_msg}... **fetching** `{run.name}`')
+
         duration = summary.get('_runtime')
         end_time = summary.get('_timestamp')
         # extract values for selected tags
-        rules = {'hotkey': re.compile('^[0-9a-z]{48}$',re.IGNORECASE), 'version': re.compile('^\\d\.\\d+\.\\d+$'), 'spec_version': re.compile('\\d{4}$')}
+        rules = {
+            'version': re.compile('^\\d\.\\d+\.\\d+$'),
+            'spec_version': re.compile('\\d{4}$'),
+            'hotkey': re.compile('^[0-9a-z]{48}$',re.IGNORECASE)
+        }
         tags = {k: tag for k, rule in rules.items() for tag in run.tags if rule.match(tag)}
         # include bool flag for remaining tags
         tags.update({k: k in run.tags for k in ('mock','disable_set_weights')})
@@ -44,16 +58,18 @@ def load_runs(project, filters, min_steps=10):
             'state': run.state,
             'num_steps': step,
             'num_completions': step*sum(len(v) for k, v in run.summary.items() if k.endswith('completions') and isinstance(v, list)),
-            'entity': run.entity,
+            'duration': pd.to_timedelta(duration, unit="s").round('T'), # round to nearest minute
+            'start_time': pd.to_datetime(end_time-duration, unit="s").round('T'),
+            'end_time': pd.to_datetime(end_time, unit="s").round('T'),
+            'netuid': run.config.get('netuid'),
+            **tags,
+            'username': run.user.username,
             'run_id': run.id,
             'run_name': run.name,
-            'project': run.project,
             'url': run.url,
+            # 'entity': run.entity,
+            # 'project': run.project,
             'run_path': os.path.join(run.entity, run.project, run.id),
-            'start_time': pd.to_datetime(end_time-duration, unit="s"),
-            'end_time': pd.to_datetime(end_time, unit="s"),
-            'duration': pd.to_timedelta(duration, unit="s").round('s'),
-            **tags
         })
         n_events += step
         successful += 1
@@ -61,8 +77,8 @@ def load_runs(project, filters, min_steps=10):
     progress.empty()
     msg.empty()
     frame = pd.DataFrame(runs)
-    mappings = {'state': 'category', 'hotkey': 'category', 'version': 'category', 'spec_version': 'category'}
-    return frame.astype({k:v for k,v in mappings.items() if k in frame.columns})
+    frame.to_csv(local_path, index=False)
+    return frame.astype({k:v for k,v in dtypes.items() if k in frame.columns})
 
 
 @st.cache_data
@@ -84,7 +100,7 @@ def load_data(selected_runs, load=True, save=False):
         if load and os.path.exists(file_path):
             progress.progress(i/len(selected_runs),f'{prog_msg}... **reading** `{file_path}`')
             try:
-                df = utils.load_data(file_path)
+                df = utils.read_data(file_path)
             except Exception as e:
                 info.warning(f'Failed to load history from `{file_path}`')
                 st.exception(e)
@@ -97,7 +113,7 @@ def load_data(selected_runs, load=True, save=False):
 
                 print(f'Downloaded {df.shape[0]} events from `{run.run_path}`. Columns: {df.columns}')
                 df.info()
-                
+
                 if save and run.state != 'running':
                     df.to_csv(file_path, index=False)
                     # st.info(f'Saved history to {file_path}')
@@ -137,7 +153,7 @@ def filter_dataframe(df: pd.DataFrame, demo_selection=None) -> pd.DataFrame:
         df = df.loc[demo_selection]
         run_msg.info(f"Selected {len(df)} runs")
         return df
-    
+
     df = df.copy()
 
     # Try to convert datetimes into a standarrd format (datetime, no timezone)
