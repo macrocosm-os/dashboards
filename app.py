@@ -9,7 +9,7 @@ from opendashboards.assets import io, inspect, metric, plot
 # cache individual file loads
 # Hotkey churn
 
-DEFAULT_PROJECT = "alpha-validators"
+WANDB_PROJECT = "opentensor-dev/alpha-validators"
 DEFAULT_FILTERS = {"tags": {"$in": [f'1.1.{i}' for i in range(10)]}}
 DEFAULT_SELECTED_HOTKEYS = None
 DEFAULT_TASK = 'qa'
@@ -21,10 +21,10 @@ st.set_page_config(
     page_title='Validator Dashboard',
     menu_items={
         'Report a bug': "https://github.com/opentensor/dashboards/issues",
-        'About': """
+        'About': f"""
         This dashboard is part of the OpenTensor project. \n
         To see runs in wandb, go to: \n
-        https://wandb.ai/opentensor-dev/alpha-validators/table?workspace=default
+        https://wandb.ai/{WANDB_PROJECT}/table?workspace=default
         """
     },
     layout = "centered"
@@ -37,7 +37,7 @@ st.markdown('#')
 
 
 with st.spinner(text=f'Checking wandb...'):
-    df_runs = io.load_runs(project=DEFAULT_PROJECT, filters=DEFAULT_FILTERS, min_steps=10)
+    df_runs = io.load_runs(project=WANDB_PROJECT, filters=DEFAULT_FILTERS, min_steps=10)
 
 metric.wandb(df_runs)
 

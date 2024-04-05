@@ -12,7 +12,6 @@ from pandas.api.types import (
     is_object_dtype,
 )
 
-
 @st.cache_data
 def load_runs(project, filters, min_steps=10):
     runs = []
@@ -21,7 +20,7 @@ def load_runs(project, filters, min_steps=10):
     progress = st.progress(0, 'Fetching runs from wandb')
     msg = st.empty()
 
-    all_runs = utils.get_runs(project, filters, api_key=st.secrets['WANDB_API_KEY'])
+    all_runs = utils.get_runs(project, filters)
     for i, run in enumerate(all_runs):
         
         summary = run.summary

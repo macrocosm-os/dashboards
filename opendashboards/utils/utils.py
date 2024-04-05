@@ -20,14 +20,16 @@ import re
 import tqdm
 import wandb
 import pandas as pd
-
+import streamlit as st
 from traceback import format_exc
 from pandas.api.types import is_list_like
 
 from typing import List, Dict, Any, Union
 
+api = wandb.Api(api_key=st.secrets['WANDB_API_KEY'])
+wandb.login(anonymous="allow")
 
-def pull_wandb_runs(project='openvalidators', filters=None, min_steps=50, ntop=10, summary_filters=None ):
+def pull_wandb_runs(project: str, filters=None, min_steps=50, ntop=10, summary_filters=None ):
     all_runs = get_runs(project, filters)
     print(f'Using {ntop}/{len(all_runs)} runs with more than {min_steps} events')
     pbar = tqdm.tqdm(all_runs)
@@ -82,19 +84,17 @@ def pull_wandb_runs(project='openvalidators', filters=None, min_steps=50, ntop=1
 
 
 
-def get_runs(project: str = "openvalidators", filters: Dict[str, Any] = None, return_paths: bool = False, api_key: str = None) -> List:
+def get_runs(project: str, filters: Dict[str, Any] = None, return_paths: bool = False) -> List:
     """Download runs from wandb.
 
     Args:
-        project (str): Name of the project. Defaults to 'openvalidators' (community project)
+        project (str): Name of the project. 
         filters (Dict[str, Any], optional): Optional run filters for wandb api. Defaults to None.
         return_paths (bool, optional): Return only run paths. Defaults to False.
 
     Returns:
         List[wandb.apis.public.Run]: List of runs or run paths (List[str]).
     """
-    api = wandb.Api(api_key=api_key)
-    wandb.login(anonymous="allow")
 
     runs = api.runs(project, filters=filters)
     if return_paths:
