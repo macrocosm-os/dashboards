@@ -21,7 +21,7 @@ from opendashboards.assets import io, inspect, metric, plot
 
 WANDB_PROJECT = "opentensor-dev/alpha-validators"
 PROJECT_URL = f'https://wandb.ai/{WANDB_PROJECT}/table?workspace=default'
-MAX_RECENT_RUNS = 100
+MAX_RECENT_RUNS = 300
 DEFAULT_FILTERS = {}#{"tags": {"$in": [f'1.1.{i}' for i in range(10)]}}
 DEFAULT_SELECTED_HOTKEYS = None
 DEFAULT_TASK = 'qa'
@@ -56,13 +56,6 @@ metric.wandb(df_runs)
 
 # add vertical space
 st.markdown('#')
-
-runid_c1, runid_c2 = st.columns([3, 1])
-# make multiselect for run_ids with label on same line
-run_ids = runid_c1.multiselect('Select one or more weights and biases run by id:', df_runs['run_id'], key='run_id', default=df_runs['run_id'][:3], help=f'Select one or more runs to analyze. You can find the raw data for these runs [here]({PROJECT_URL}).')
-n_runs = len(run_ids)
-df_runs_subset = df_runs[df_runs['run_id'].isin(run_ids)]
-
 st.markdown('#')
 
 tab1, tab2, tab3, tab4 = st.tabs(["Run Data", "UID Health", "Completions", "Prompt-based scoring"])
@@ -72,7 +65,13 @@ with tab1:
 
     st.markdown('#')
     st.subheader(":violet[Run] Data")
-    with st.expander(f'Show :violet[all] wandb runs'):
+
+    # make multiselect for run_ids with label on same line
+    run_ids = st.multiselect('Select one or more weights and biases run by id:', df_runs['run_id'], key='run_id', default=df_runs['run_id'][:3], help=f'Select one or more runs to analyze. You can find the raw data for these runs [here]({PROJECT_URL}).')
+    n_runs = len(run_ids)
+    df_runs_subset = df_runs[df_runs['run_id'].isin(run_ids)]
+
+    with st.expander(f'Select from :violet[all] wandb runs'):
 
         edited_df = st.data_editor(
             df_runs.assign(Select=False).set_index('Select'),

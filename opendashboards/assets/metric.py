@@ -28,29 +28,28 @@ def wandb(df_runs):
     col2.metric('Hotkeys', fmt(df_runs.hotkey.nunique()), delta=fmt(df_runs.hotkey.nunique()-df_runs_old.hotkey.nunique())+' (24h)')
     col3.metric('Events', fmt(df_runs.num_steps.sum()), delta=fmt(df_runs.num_steps.sum()-df_runs_old.num_steps.sum())+' (24h)')
     col4.metric('Completions', fmt(df_runs.num_completions.sum()), delta=fmt(df_runs.num_completions.sum()-df_runs_old.num_completions.sum())+' (24h)')
-    
+
     st.markdown('----')
 
 
 @st.cache_data
-def runs(df_long):
-    
+def runs(df_long, full=False):
+
     col1, col2, col3, col4 = st.columns(4)
-    print(df_long.columns)
 
     # Convert to appropriate units e.g. 1.2k instead of 1200.c
     col1.metric('Runs', fmt(df_long.run_id.nunique()))
     col2.metric('Hotkeys', fmt(df_long.hotkey.nunique()))
     col3.metric('Events', fmt(df_long.groupby(['run_id','_step']).ngroups))
     col4.metric('Completions', fmt(df_long.shape[0]))
-    
-    aggs = df_long.groupby('task').agg({'uids': 'nunique', 'completions': 'nunique'})
-    print(aggs)
-    for i,c in enumerate(st.columns(len(aggs))):
-        name = aggs.index[i].title()
-        uid_unique, comp_unique = aggs.iloc[i]
-        c.metric(label=f'{name} UIDs', value=uid_unique) 
-        c.metric(label=f'{name} Completions', value=comp_unique)
+
+    if full:
+        aggs = df_long.groupby('task').agg({'uids': 'nunique', 'completions': 'nunique'})
+        for i,c in enumerate(st.columns(len(aggs))):
+            name = aggs.index[i].title()
+            uid_unique, comp_unique = aggs.iloc[i]
+            c.metric(label=f'{name} UIDs', value=uid_unique)
+            c.metric(label=f'{name} Completions', value=comp_unique)
 
     st.markdown('----')
 
@@ -76,7 +75,7 @@ def uids(df_long, src, uids=None):
         help='Number of unique completions divided by total number of events'
     )
     # uniqueness can be expressed as the average number of unique completions per uid divided by all unique completions
-    # uniqueness is the shared completions between selected uids 
+    # uniqueness is the shared completions between selected uids
 
     col3.metric(
         label="Uniqueness %",
